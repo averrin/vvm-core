@@ -28,6 +28,7 @@ public:
 
         void clear();
         void resize(unsigned int size);
+        void dump(const std::string_view name);
 
 	friend std::ostream& operator<<(std::ostream& os, const MemoryContainer& mem)
 	{

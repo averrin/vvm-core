@@ -5,7 +5,7 @@
 
 class VideoDevice : public Device {
 public:
-    VideoDevice(unsigned int w, unsigned int h) : Device(std::byte{0x12}, std::make_shared<MemoryContainer>(w*h)), width(w), height(h) {}
+    VideoDevice(std::byte id, unsigned int w, unsigned int h) : Device(id, std::make_shared<MemoryContainer>(w*h)), width(w), height(h) {}
     std::string deviceName = "Video memory";
 	void tickHandler() {};
 

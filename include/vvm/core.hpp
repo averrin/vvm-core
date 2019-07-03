@@ -29,8 +29,6 @@ private:
 	t_handler _tickHandler;
 	std::map<const std::byte, t_handler> _intHandlers;
 
-	std::vector<std::shared_ptr<Device>> devices;
-
 	void checkInterruption();
 	void printCode(const std::string_view code, const address arg1, unsigned int arg2);
 	void printCode(const std::string_view code, const address arg1);
@@ -99,7 +97,9 @@ public:
     std::unique_ptr<MemoryContainer> meta;
     std::unique_ptr<MemoryContainer> code;
     std::unique_ptr<MemoryContainer> d_table;
+    std::unique_ptr<MemoryContainer> stack;
     std::vector<std::shared_ptr<MemoryContainer>> memory;
+	std::vector<std::shared_ptr<Device>> devices;
 
     static std::optional<op_spec> getSpec(predicate);
     static std::optional<address> isReservedMem(std::string arg);
@@ -115,7 +115,6 @@ public:
 	void setState(const std::byte state);
 	bool checkFlag(const std::byte intf);
 	void setFlag(const std::byte flag, const bool value);
-	 
 	void setReg(const address reg, const address value);
 	void setReg(const address reg, const int value);
 

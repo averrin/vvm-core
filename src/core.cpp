@@ -106,15 +106,21 @@ void Core::compile(analyzer::script instructions) {
     }
   }
 
-  d_table = std::make_unique<MemoryContainer>(MemoryContainer(DTABLE_SIZE));
-  d_table->offset = pointer;
   auto written = pointer;
+  code->resize((written - code->offset).dst);
+
+  d_table = std::make_unique<MemoryContainer>(MemoryContainer(DTABLE_SIZE));
+  d_table->offset = code->offset + code->size;
+
+  stack = std::make_unique<MemoryContainer>(MemoryContainer(STACK_SIZE));
+  stack->offset = d_table->offset + d_table->size;
+
   seek(ESP);
-  auto stack_head = (written + d_table->size + STACK_SIZE);
+  auto stack_head = stack->offset + stack->size;
   writeInt(stack_head.dst);
   seek(EIP);
-  writeInt(CODE_OFFSET.dst);
-  code->resize((written - code->offset).dst + STACK_SIZE);
+  std::cout << code->offset << std::endl << std::flush;
+  writeInt(code->offset.dst);
   seek(EDI);
 
   address offset;
@@ -132,10 +138,11 @@ void Core::compile(analyzer::script instructions) {
   std::cout << "Device Table offset: " << d_table->offset << std::endl;
   std::cout << "Device Table size: " << d_table->size << std::endl;
   std::cout << "Stack head: " << stack_head << std::endl;
-  std::cout << "Stack size: " << STACK_SIZE << std::endl;
-  std::cout << "Stack tile: " << stack_head - STACK_SIZE << std::endl;
+  std::cout << "Stack size: " << stack->size << std::endl;
+  std::cout << "Stack tail: " << stack->offset - STACK_SIZE << std::endl;
 }
 
+//TODO: dump whole memory without partitions
 void Core::saveBytes(const std::string_view name) {
   std::ofstream file(static_cast<std::string>(name), std::ios::binary);
   size_t count = CODE_OFFSET.dst / sizeof(std::byte);
@@ -144,6 +151,8 @@ void Core::saveBytes(const std::string_view name) {
   file.write(reinterpret_cast<char *>(&(code->data)[0]), count * sizeof(std::byte));
   count = d_table->size / sizeof(std::byte);
   file.write(reinterpret_cast<char *>(&(d_table->data)[0]), count * sizeof(std::byte));
+  count = stack->size / sizeof(std::byte);
+  file.write(reinterpret_cast<char *>(&(stack->data)[0]), count * sizeof(std::byte));
   for (auto m : memory) {
     count = m->size / sizeof(std::byte);
     file.write(reinterpret_cast<char *>(&(m->data)[0]), count * sizeof(std::byte));
@@ -167,6 +176,8 @@ MemoryContainer* Core::getMem() {
       return code.get();
   } else if (pointer.dst < (d_table->offset + d_table->size).dst) {
       return d_table.get();
+  } else if (pointer.dst < (stack->offset + stack->size).dst) {
+      return stack.get();
   } else {
       for (auto m : memory) {
           if (m->offset.dst <= pointer.dst && pointer.dst < (m->offset + m->size).dst) {
@@ -377,7 +388,7 @@ std::byte Core::readRegByte(const address reg) {
 address Core::addDevice(std::shared_ptr<Device> device) {
   address addr;
   if (devices.size() == MAX_DEVICES) {
-    std::cerr << "Too many devices. Device " << fmt::format("{:02X}", static_cast<unsigned int>(device->deviceId)) << " wasnt connected" << std::endl;
+    std::cerr << "Too many devices. Device " << fmt::format("0x{:02X}", static_cast<unsigned int>(device->deviceId)) << " wasnt connected" << std::endl;
     return addr;
   }
   auto _pointer = pointer;

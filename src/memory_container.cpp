@@ -1,4 +1,7 @@
 #include "vvm/memory_container.hpp"
+#include <fstream>
+#include <sstream>
+#include <utility>
 
 MemoryContainer::MemoryContainer(unsigned int s): size(s) {
     data = vm_mem{};
@@ -49,4 +52,11 @@ void MemoryContainer::resize(unsigned int new_size) {
 
 void MemoryContainer::clear() {
     data.assign(size, std::byte{0x0});
+}
+
+void MemoryContainer::dump(const std::string_view name) {
+  std::ofstream file(static_cast<std::string>(name), std::ios::binary);
+  auto count = size / sizeof(std::byte);
+  file.write(reinterpret_cast<char *>(&(data)[0]), count * sizeof(std::byte));
+  file.close();
 }
