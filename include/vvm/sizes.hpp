@@ -6,6 +6,9 @@ const int ADDRESS_SIZE = BYTE_SIZE + INT_SIZE;
 const int OPCODE_SIZE =  BYTE_SIZE;
 
 const int HEADER_SIZE = 8;
+const int MAX_DEVICES = 4;
+const int D_SIZE = BYTE_SIZE + INT_SIZE + INT_SIZE;
+const int DTABLE_SIZE = D_SIZE * MAX_DEVICES;
 const int STACK_SIZE = 128;
 
 const int OP_aa_length = OPCODE_SIZE + ADDRESS_SIZE + ADDRESS_SIZE;

@@ -5,7 +5,7 @@
 
 class RngDevice : public Device {
 public:
-    RngDevice(unsigned int s) : Device(std::make_shared<MemoryContainer>(s)) {}
+    RngDevice(unsigned int s) : Device(std::byte{0x10}, std::make_shared<MemoryContainer>(s)) {}
     std::string deviceName = "Random generator";
 	void tickHandler();
 };

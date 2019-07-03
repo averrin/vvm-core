@@ -10,13 +10,14 @@ typedef std::function<void()> dt_handler;
 
 class Device {
 public:
-    Device() {}
-    Device(std::shared_ptr<MemoryContainer> m) : memory(m) {}
+    Device(std::byte id) : deviceId(id) {}
+    Device(std::byte id, std::shared_ptr<MemoryContainer> m) : deviceId(id), memory(m) {}
     virtual ~Device() = default;
     std::shared_ptr<MemoryContainer> memory;
 	virtual void tickHandler() = 0;
 	std::map<const std::byte, dt_handler> intHandlers;
     std::string deviceName;
+    std::byte deviceId;
 };
 
 #endif // __DEVICE_H_

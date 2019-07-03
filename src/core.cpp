@@ -59,7 +59,7 @@ unsigned int Core::getSize() {
     for (auto m : memory) {
         mo += m->size;
     }
-    return (code->offset + code->size + mo).dst;
+    return (d_table->offset + d_table->size + mo).dst;
 }
 
 void Core::setInterruptHandler(const std::byte interrupt,
@@ -105,9 +105,13 @@ void Core::compile(analyzer::script instructions) {
     default:;
     }
   }
+
+  d_table = std::make_unique<MemoryContainer>(MemoryContainer(DTABLE_SIZE));
+  d_table->offset = pointer;
   auto written = pointer;
   seek(ESP);
-  writeInt((written + STACK_SIZE).dst);
+  auto stack_head = (written + d_table->size + STACK_SIZE);
+  writeInt(stack_head.dst);
   seek(EIP);
   writeInt(CODE_OFFSET.dst);
   code->resize((written - code->offset).dst + STACK_SIZE);
@@ -123,7 +127,13 @@ void Core::compile(analyzer::script instructions) {
   seek(CODE_OFFSET);
 
   next_spec_type = instructions.front().spec.type;
+  std::cout << "Header size: " << meta->size << std::endl;
   std::cout << "Compiled. Code size: " << code->size << std::endl;
+  std::cout << "Device Table offset: " << d_table->offset << std::endl;
+  std::cout << "Device Table size: " << d_table->size << std::endl;
+  std::cout << "Stack head: " << stack_head << std::endl;
+  std::cout << "Stack size: " << STACK_SIZE << std::endl;
+  std::cout << "Stack tile: " << stack_head - STACK_SIZE << std::endl;
 }
 
 void Core::saveBytes(const std::string_view name) {
@@ -132,6 +142,8 @@ void Core::saveBytes(const std::string_view name) {
   file.write(reinterpret_cast<char *>(&(meta->data)[0]), count * sizeof(std::byte));
   count = code->size / sizeof(std::byte);
   file.write(reinterpret_cast<char *>(&(code->data)[0]), count * sizeof(std::byte));
+  count = d_table->size / sizeof(std::byte);
+  file.write(reinterpret_cast<char *>(&(d_table->data)[0]), count * sizeof(std::byte));
   for (auto m : memory) {
     count = m->size / sizeof(std::byte);
     file.write(reinterpret_cast<char *>(&(m->data)[0]), count * sizeof(std::byte));
@@ -150,9 +162,11 @@ address Core::readAddress() {
 MemoryContainer* Core::getMem() {
   MemoryContainer* mem;
   if (pointer.dst < CODE_OFFSET.dst) {
-      mem = meta.get();
-  } else if (pointer.dst < (CODE_OFFSET + code->size).dst) {
-      mem = code.get();
+      return meta.get();
+  } else if (pointer.dst < (code->offset + code->size).dst) {
+      return code.get();
+  } else if (pointer.dst < (d_table->offset + d_table->size).dst) {
+      return d_table.get();
   } else {
       for (auto m : memory) {
           if (m->offset.dst <= pointer.dst && pointer.dst < (m->offset + m->size).dst) {
@@ -361,15 +375,30 @@ std::byte Core::readRegByte(const address reg) {
 
 
 address Core::addDevice(std::shared_ptr<Device> device) {
+  address addr;
+  if (devices.size() == MAX_DEVICES) {
+    std::cerr << "Too many devices. Device " << fmt::format("{:02X}", static_cast<unsigned int>(device->deviceId)) << " wasnt connected" << std::endl;
+    return addr;
+  }
+  auto _pointer = pointer;
+  if (device->memory != nullptr && device->memory->size != 0) {
+    addr = mapMem(device->memory);
+    auto offset = d_table->offset + D_SIZE*devices.size();
+    seek(offset);
+    writeByte(device->deviceId);
+    writeInt(addr.dst);
+    writeInt(device->memory->size);
+    seek(_pointer);
+  }
   devices.push_back(device);
-  return mapMem(device->memory);
+  return addr;
 }
 
 //TODO: implement EDI switching
 address Core::mapMem(std::shared_ptr<MemoryContainer> mem) {
     address offset;
     if (memory.size() == 0) {
-        offset = code->offset + code->size;
+        offset = d_table->offset + d_table->size;
     } else {
         offset = memory.back()->offset + memory.back()->size;
     }

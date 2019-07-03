@@ -98,6 +98,7 @@ public:
 
     std::unique_ptr<MemoryContainer> meta;
     std::unique_ptr<MemoryContainer> code;
+    std::unique_ptr<MemoryContainer> d_table;
     std::vector<std::shared_ptr<MemoryContainer>> memory;
 
     static std::optional<op_spec> getSpec(predicate);

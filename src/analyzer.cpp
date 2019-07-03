@@ -195,7 +195,7 @@ script Analyzer::parseFile(std::string filename) {
     std::cout << "Unable to open file";
 
   for (auto[n, label] : pending_jumps) {
-      std::cout << n << " " << label << std::endl;
+      // std::cout << n << " " << label << std::endl;
     const auto dst =
         std::find_if(code.begin(), code.end(), [&, label = label](code_instruction ins) {
           return std::find(ins.aliases.begin(), ins.aliases.end(), label) !=

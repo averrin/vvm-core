@@ -30,7 +30,7 @@ const std::byte STOREBYTE{ 1 << 1 }; // 0000 0001
 const address CO_ADDR = address{0x4}; //TODO: convert offset to int
 
 const address STATE = address{ HEADER_SIZE + 0x0 };
-const address ESP = STATE + 1;
+const address ESP = STATE + BYTE_SIZE;
 const address EAX = ESP + INT_SIZE;
 const address EBX = EAX + INT_SIZE;
 const address ECX = EBX + INT_SIZE;
