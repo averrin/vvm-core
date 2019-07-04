@@ -7,12 +7,23 @@
 //TODO: write one function for std::variant and op_size
 
 std::string detectAddress(const address addr) {
-  if (addr == EAX) {
-    return "EAX";
-  } else if (addr == EBX) {
-    return "EBX";
-  } else if (addr == ECX) {
-    return "ECX";
+  std::map<address, std::string> names = {
+    {EAX, "EAX"},
+    {EBX, "EBX"},
+    {ECX, "ECX"},
+    {ESP, "ESP"},
+    {EIP, "EIP"},
+    {EDI, "EDI"},
+    {AH, "AH"},
+    {BH, "BH"},
+    {CH, "CH"},
+    {AL, "AL"},
+    {BL, "BL"},
+    {CL, "CL"},
+  };
+  auto it = names.find(addr);
+  if (it != names.end()) {
+    return names[addr];
   }
   return fmt::format("{}", addr);
 }

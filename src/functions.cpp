@@ -282,7 +282,7 @@ address Core::CMP_ai_func(address _pointer) {
   auto args = readArgs(_pointer, op_spec::AI, true);
   auto [a1, value] = args.args;
   _pointer = args.current_pointer;
- 
+
   setFlag(ZF, a1 == value);
   seek(_pointer);
   printCode("CMP", std::get<address>(args.orig_args.first), std::get<unsigned int>(value));
@@ -319,7 +319,11 @@ address Core::JNE_a_func(address _pointer) {
   seek(_pointer);
   auto jumped = false;
   if (!checkFlag(ZF)) {
-    _pointer = std::get<address>(src);
+    auto dst = std::get<address>(src);
+    if (dst.relative) {
+      dst = _pointer + dst.dst - ADDRESS_SIZE - BYTE_SIZE;
+    }
+    _pointer = dst;
     seek(_pointer);
     jumped = true;
   }
@@ -352,7 +356,11 @@ address Core::JE_func(address _pointer) {
 
   auto jumped = false;
   if (checkFlag(ZF)) {
-    _pointer = std::get<address>(src);
+    auto dst = std::get<address>(src);
+    if (dst.relative) {
+      dst = _pointer + dst.dst - ADDRESS_SIZE - BYTE_SIZE;
+    }
+    _pointer = dst;
     jumped = true;
   }
   seek(_pointer);
@@ -389,13 +397,11 @@ address Core::PUSH_i_func(address _pointer) {
   auto args = readArgs(_pointer, op_spec::I);
   auto [value, _] = args.args;
   _pointer = args.current_pointer;
-  seek(ESP);
-  auto s = address{readInt()};
+  auto s = readRegAddress(ESP);
   const auto s_addr = s - INT_SIZE;
   seek(s_addr);
   writeInt(value);
-  seek(ESP);
-  writeInt(s_addr.dst);
+  setReg(ESP, s_addr);
   seek(_pointer);
   printCode("PUSH", std::get<unsigned int>(value));
   return _pointer;
@@ -406,13 +412,11 @@ address Core::PUSH_w_func(address _pointer) {
   auto args = readArgs(_pointer, op_spec::W);
   auto [value, _] = args.args;
   _pointer = args.current_pointer;
-  seek(ESP);
-  auto s = address{readInt()};
+  auto s = readRegAddress(ESP);
   const auto s_addr = s - INT_SIZE;
   seek(s_addr);
   writeInt(static_cast<unsigned int>(std::get<std::byte>(value)));
-  seek(ESP);
-  writeInt(s_addr.dst);
+  setReg(ESP, s_addr);
   seek(_pointer);
   printCode("PUSH", std::get<std::byte>(value));
   return _pointer;
@@ -423,16 +427,15 @@ address Core::POP_func(address _pointer) {
   auto args = readArgs(_pointer, op_spec::A);
   auto [dst, _] = args.args;
   _pointer = args.current_pointer;
-  seek(ESP);
-  const auto s_addr = address{readInt()};
+
+  const auto s_addr = readRegAddress(ESP);
   seek(s_addr);
   const auto value = readInt();
   seek(s_addr);
   writeInt(0x0);
   seek(dst);
   writeInt(value);
-  seek(ESP);
-  writeInt((s_addr + INT_SIZE).dst);
+  setReg(ESP, s_addr + INT_SIZE);
 
   seek(_pointer);
   printCode("POP", std::get<address>(dst));
@@ -444,10 +447,49 @@ address Core::JMP_a_func(address _pointer) {
   auto [src, _] = args.args;
   _pointer = args.current_pointer;
 
-  _pointer = std::get<address>(src);
+
+  auto dst = std::get<address>(src);
+  if (dst.relative) {
+    dst = _pointer + dst.dst - ADDRESS_SIZE - BYTE_SIZE;
+  }
+  _pointer = dst;
   seek(_pointer);
   setReg(EIP, _pointer);
   printJump("JMP", _pointer, true);
+  return _pointer;
+}
+
+address Core::CALL_func(address _pointer) {
+  auto args = readArgs(_pointer, op_spec::A);
+  auto [src, _] = args.args;
+  _pointer = args.current_pointer;
+
+  auto ret = readRegAddress(EIP) + BYTE_SIZE + ADDRESS_SIZE; // + CALL length + arg length
+
+  auto s = readRegAddress(ESP);
+  const auto s_addr = s - INT_SIZE;
+  seek(s_addr);
+  writeInt(ret.dst);
+  setReg(ESP, s_addr);
+
+  _pointer = std::get<address>(src);
+  seek(_pointer);
+  setReg(EIP, _pointer);
+  printJump("CALL", _pointer, true);
+  return _pointer;
+}
+
+address Core::RET_func(address _pointer) {
+  auto args = readArgs(_pointer, op_spec::A);
+  auto [src, _] = args.args;
+  _pointer = args.current_pointer;
+
+  const auto s_addr = readRegAddress(ESP);
+  seek(s_addr);
+  _pointer = address{readInt()};
+  setReg(EIP, _pointer);
+  seek(_pointer);
+  printJump("RET", _pointer, true);
   return _pointer;
 }
 

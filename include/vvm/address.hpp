@@ -10,6 +10,7 @@ struct address
 	unsigned int dst;
     bool redirect = false;
     bool storeByte = false;
+	bool relative = false;
 	friend bool operator==(const address& lhs, const address&  rhs)
 	{
 		return lhs.dst == rhs.dst;
@@ -54,9 +55,15 @@ struct address
 		return lhs.dst < rhs.dst;
 	}
 
+	friend bool operator<(const address& lhs, const address& rhs)
+	{
+		return lhs.dst < rhs.dst;
+	}
+
 	friend std::ostream& operator<<(std::ostream& os, const address& addr)
 	{
-		os << fmt::format("{}{:0{}X}{}",
+		os << fmt::format("{}{}{:0{}X}{}",
+                          addr.relative ? "~" : "",
                           addr.redirect ? "[" : (addr.storeByte ? "*" : "."),
                           addr.dst, INT_SIZE*2,
                           addr.redirect ? "]" : " ");

@@ -8,12 +8,12 @@
 #include <variant>
 #include <numeric>
 
-std::array<op_spec, 27> specs = {
+std::array<op_spec, 29> specs = {
     INVALID_spec, NOP_spec,    MOV_aa_spec, MOV_ai_spec, MOV_aw_spec, ADD_aa_spec,
     ADD_ai_spec,  ADD_aw_spec, SUB_aa_spec, SUB_ai_spec, SUB_aw_spec, CMP_aa_spec,
     CMP_ai_spec,  CMP_aw_spec,JNE_a_spec,  JNE_r_spec,  JE_spec,     JMP_a_spec,
     JMP_r_spec,   INT_spec,    PUSH_a_spec, PUSH_w_spec, PUSH_i_spec, POP_spec,
-    INC_spec,     DEC_spec,    MEM_spec
+    INC_spec,     DEC_spec,    MEM_spec, CALL_spec, RET_spec,
 };
 
 address address::BEGIN = address{0x0};
@@ -26,6 +26,7 @@ std::map<std::string, address> reserved_addresses = {
     {"EDI", EDI},
     {"FLAGS", FLAGS},       {"INTERRUPTS", INTERRUPTS},
     {"AL", AL}, {"BL", BL}, {"CL", CL},
+    {"AH", AH}, {"BH", BH}, {"CH", CH},
 };
 
 std::optional<address> Core::isReservedMem(std::string arg) {
@@ -139,7 +140,7 @@ void Core::compile(analyzer::script instructions) {
   std::cout << "Device Table size: " << d_table->size << std::endl;
   std::cout << "Stack head: " << stack_head << std::endl;
   std::cout << "Stack size: " << stack->size << std::endl;
-  std::cout << "Stack tail: " << stack->offset - STACK_SIZE << std::endl;
+  std::cout << "Stack tail: " << stack->offset << std::endl;
 }
 
 //TODO: dump whole memory without partitions
@@ -165,11 +166,15 @@ void Core::seek(address addr) { pointer = addr; }
 
 address Core::readAddress() {
     auto rf = readByte();
-    return address{readInt(), static_cast<bool>(rf & REDIRECT), static_cast<bool>(rf & STOREBYTE)};
+    return address{
+      readInt(),
+      static_cast<bool>(rf & REDIRECT),
+      static_cast<bool>(rf & STOREBYTE),
+      static_cast<bool>(rf & RELATIVE),
+  };
 }
 
 MemoryContainer* Core::getMem() {
-  MemoryContainer* mem;
   if (pointer.dst < CODE_OFFSET.dst) {
       return meta.get();
   } else if (pointer.dst < (code->offset + code->size).dst) {
@@ -181,12 +186,13 @@ MemoryContainer* Core::getMem() {
   } else {
       for (auto m : memory) {
           if (m->offset.dst <= pointer.dst && pointer.dst < (m->offset + m->size).dst) {
-              mem = m.get();
+              return m.get();
               break;
           }
       }
   }
-  return mem;
+  std::cerr << "get mem returning black hole!!!" << std::endl;
+  return nullptr;
 }
 
 unsigned int Core::readInt() {
@@ -208,6 +214,7 @@ int Core::readSignedInt() {
 void Core::writeAddress(const instruction_arg n) { writeAddress(std::get<address>(n)); }
 void Core::writeAddress(const address n) {
     auto flags = ZERO;
+    if (n.relative) flags |= RELATIVE;
     if (n.redirect) flags |= REDIRECT;
     if (n.storeByte) flags |= STOREBYTE;
     writeByte(flags);
@@ -409,7 +416,7 @@ address Core::addDevice(std::shared_ptr<Device> device) {
 address Core::mapMem(std::shared_ptr<MemoryContainer> mem) {
     address offset;
     if (memory.size() == 0) {
-        offset = d_table->offset + d_table->size;
+        offset = stack->offset + stack->size;
     } else {
         offset = memory.back()->offset + memory.back()->size;
     }
@@ -461,6 +468,14 @@ void Core::execCode(address local_pointer) {
 address Core::execStep(address local_pointer) {
   setReg(EIP, local_pointer);
   const auto opcode = readByte();
+  // std::cout << "Pointer: " << local_pointer
+  //   << fmt::format(" OPCODE: 0x{:02X}", static_cast<unsigned int>(opcode))
+  //   << std::endl;
+
+  // if (opcode == std::byte{0x0}) {
+  //   std::cerr << "WAT?! OPCODE == 0x0" << std::endl;
+  //   return local_pointer;
+  // }
 
   auto spec = std::find_if(specs.begin(), specs.end(),
                            [&](op_spec s) { return s.opcode == opcode; });
@@ -518,16 +533,20 @@ address Core::execStep(address local_pointer) {
     local_pointer = DEC_func(local_pointer);
   } else if (opcode == MEM) {
     local_pointer = MEM_func(local_pointer);
+  } else if (opcode == CALL) {
+    local_pointer = CALL_func(local_pointer);
+  } else if (opcode == RET) {
+    local_pointer = RET_func(local_pointer);
   }
   checkInterruption();
   _tickHandler(*getMem(), pointer.dst);
   for (auto d : devices) {
     d->tickHandler();
   }
-  if (pointer.dst >= (code->offset + code->size).dst) {
-    // TODO: implement irq and error handler
-    setState(STATE_ERROR);
-  }
+  // if (pointer.dst >= (code->offset + code->size).dst) {
+  //   // TODO: implement irq and error handler
+  //   setState(STATE_ERROR);
+  // }
 
   const auto next_opcode = readByte();
   seek(local_pointer);

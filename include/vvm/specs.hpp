@@ -121,6 +121,11 @@ const op_spec DEC_spec{ DEC, "DEC", op_spec::OP_TYPE::A };
 const std::byte MEM{ 0xfa };
 const op_spec MEM_spec{ MEM, "MEM", op_spec::OP_TYPE::AW };
 
+const std::byte CALL{ 0xE8 };
+const op_spec CALL_spec{ CALL, "CALL", op_spec::OP_TYPE::A };
+const std::byte RET{ 0xC3 };
+const op_spec RET_spec{ RET, "RET", op_spec::OP_TYPE::Z };
+
 //TODO
 const std::byte AND_aa{ 0x20 };
 const std::byte AND_ai{ 0x21 };

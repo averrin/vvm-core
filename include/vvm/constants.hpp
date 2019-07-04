@@ -25,7 +25,8 @@ const std::byte INTF{ 1 << 2 }; // 0000 0100
 
 const std::byte ZERO{ 0x0 };
 const std::byte REDIRECT{ 1 << 0 }; // 0000 0001
-const std::byte STOREBYTE{ 1 << 1 }; // 0000 0001
+const std::byte STOREBYTE{ 1 << 1 }; // 0000 0010
+const std::byte RELATIVE{ 1 << 2 }; // 0000 0100
 
 const address CO_ADDR = address{0x4}; //TODO: convert offset to int
 
@@ -44,5 +45,9 @@ const address CODE_OFFSET = INTERRUPTS + INT_SIZE;
 const address AL = address{EAX.dst, false, true};
 const address BL = address{EBX.dst, false, true};
 const address CL = address{ECX.dst, false, true};
+
+const address AH = address{EAX.dst - BYTE_SIZE, false, true};
+const address BH = address{EBX.dst - BYTE_SIZE, false, true};
+const address CH = address{ECX.dst - BYTE_SIZE, false, true};
 
 #endif

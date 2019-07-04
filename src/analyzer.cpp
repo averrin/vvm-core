@@ -9,6 +9,7 @@
 #include <sstream>
 #include <utility>
 #include <variant>
+#include <regex>
 
 using namespace analyzer;
 
@@ -63,11 +64,15 @@ script Analyzer::parseFile(std::string filename) {
   std::map<int, std::string> pending_jumps;
   if (vvmc_file.is_open()) {
 
+    std::regex comments ("\\s*;.*");
+
     auto n = 0;
     while (getline(vvmc_file, line)) {
       if (line.front() == ';') {
         continue;
       }
+      line = std::regex_replace (line, comments, "");
+      std::cout << "'" << line << "'" << std::endl;
 
       if (line.back() == ':') {
         line.erase(std::find_if(line.rbegin(), line.rend(),
@@ -202,7 +207,9 @@ script Analyzer::parseFile(std::string filename) {
                  ins.aliases.end();
         });
     if (dst != code.end()) {
-      code[n].arg1 = (*dst).offset;
+      auto dst_addr = (*dst).offset - code[n].offset.dst;
+      dst_addr.relative = true;
+      code[n].arg1 = dst_addr;
     } else
       fmt::print("not found");
   }

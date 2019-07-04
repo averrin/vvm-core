@@ -88,6 +88,9 @@ private:
 	address JMP_r_func(address _pointer);
 	address MEM_func(address _pointer);
 
+	address CALL_func(address _pointer);
+	address RET_func(address _pointer);
+
     MemoryContainer* getMem();
 
 public:
