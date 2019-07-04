@@ -128,8 +128,8 @@ public:
 	int readSignedInt();
 
     arguments readArgs(address _pointer,op_spec::OP_TYPE opType, bool reread_first=false, bool reread_second=false);
-	void execCode();
-	void execCode(address local_pointer);
+	address execCode(std::vector<address>);
+	address execCode(address local_pointer, std::vector<address>);
 	address execStep(address local_pointer);
 	address mapMem(std::shared_ptr<MemoryContainer> mem);
 	address addDevice(std::shared_ptr<Device> device);

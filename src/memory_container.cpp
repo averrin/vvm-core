@@ -55,6 +55,7 @@ void MemoryContainer::clear() {
 }
 
 void MemoryContainer::dump(const std::string_view name) {
+  fmt::print("Dump memory to file: {}\n", name);
   std::ofstream file(static_cast<std::string>(name), std::ios::binary);
   auto count = size / sizeof(std::byte);
   file.write(reinterpret_cast<char *>(&(data)[0]), count * sizeof(std::byte));

@@ -72,7 +72,6 @@ script Analyzer::parseFile(std::string filename) {
         continue;
       }
       line = std::regex_replace (line, comments, "");
-      std::cout << "'" << line << "'" << std::endl;
 
       if (line.back() == ':') {
         line.erase(std::find_if(line.rbegin(), line.rend(),
@@ -168,15 +167,15 @@ script Analyzer::parseFile(std::string filename) {
         std::cout << op << " " << specType << std::endl;
         continue;
       }
-      code_instruction i{{local_pointer}, *spec};
+      auto i = new code_instruction{{local_pointer}, *spec};
       auto real_length = get_spec_length(*spec);
       local_pointer += real_length;
 
-      i.arg1 = parsed_arg1;
-      i.arg2 = parsed_arg2;
-      i.aliases.push_back(fmt::format("{}", n));
+      i->arg1 = parsed_arg1;
+      i->arg2 = parsed_arg2;
+      i->aliases.push_back(fmt::format("{}", n));
       if (last_label != "") {
-        i.aliases.push_back(last_label);
+        i->aliases.push_back(last_label);
         last_label = "";
       }
 
@@ -188,11 +187,11 @@ script Analyzer::parseFile(std::string filename) {
       n++;
     }
 
-    code_instruction i{{local_pointer}, INT_spec};
+    auto i = new code_instruction{{local_pointer}, INT_spec};
     auto real_length = get_spec_length(INT_spec);
 
-    i.arg1 = INT_END;
-    i.aliases.push_back(fmt::format("{}", n));
+    i->arg1 = INT_END;
+    i->aliases.push_back(fmt::format("{}", n));
 
     code.push_back(i);
     vvmc_file.close();
@@ -202,21 +201,21 @@ script Analyzer::parseFile(std::string filename) {
   for (auto[n, label] : pending_jumps) {
       // std::cout << n << " " << label << std::endl;
     const auto dst =
-        std::find_if(code.begin(), code.end(), [&, label = label](code_instruction ins) {
-          return std::find(ins.aliases.begin(), ins.aliases.end(), label) !=
-                 ins.aliases.end();
+        std::find_if(code.begin(), code.end(), [&, label = label](code_instruction* ins) {
+          return std::find(ins->aliases.begin(), ins->aliases.end(), label) !=
+                 ins->aliases.end();
         });
     if (dst != code.end()) {
-      auto dst_addr = (*dst).offset - code[n].offset.dst;
+      auto dst_addr = (*dst)->offset - code[n]->offset.dst;
       dst_addr.relative = true;
-      code[n].arg1 = dst_addr;
+      code[n]->arg1 = dst_addr;
     } else
       fmt::print("not found");
   }
 
   fmt::print("\nParsed instructions:\n");
   for (auto i : code) {
-    std::cout << i << std::endl;
+    std::cout << *i << std::endl;
   }
   fmt::print("\n");
 
@@ -239,34 +238,34 @@ script Analyzer::disassemble(std::shared_ptr<Core> core) {
       fmt::print("Unknown opcode");
       break;
     }
-    code_instruction i{{local_pointer}, *spec};
+    auto i = new code_instruction{{local_pointer}, *spec};
     local_pointer++;
     auto real_length = get_spec_length(*spec);
     local_pointer--;
     local_pointer -= real_length - 1;
     core->seek(local_pointer);
 
-    switch (i.spec.type) {
+    switch (i->spec.type) {
     case op_spec::AA:
-      i.arg1 = core->readAddress();
-      i.arg2 = core->readAddress();
+      i->arg1 = core->readAddress();
+      i->arg2 = core->readAddress();
       break;
     case op_spec::AW:
-      i.arg1 = core->readAddress();
-      i.arg2 = core->readByte();
+      i->arg1 = core->readAddress();
+      i->arg2 = core->readByte();
       break;
     case op_spec::AI:
-      i.arg1 = core->readAddress();
-      i.arg2 = core->readInt();
+      i->arg1 = core->readAddress();
+      i->arg2 = core->readInt();
       break;
     case op_spec::A:
-      i.arg1 = core->readAddress();
+      i->arg1 = core->readAddress();
       break;
     case op_spec::I:
-      i.arg1 = core->readInt();
+      i->arg1 = core->readInt();
       break;
     case op_spec::W:
-      i.arg1 = core->readByte();
+      i->arg1 = core->readByte();
       break;
     case op_spec::Z:
       break;
@@ -274,11 +273,11 @@ script Analyzer::disassemble(std::shared_ptr<Core> core) {
     }
     local_pointer = core->pointer;
 
-    i.aliases.push_back(fmt::format("{}", n));
+    i->aliases.push_back(fmt::format("{}", n));
     n++;
     code.push_back(i);
 
-    if (opcode == INT_spec.opcode && std::get<std::byte>(i.arg1) == INT_END) {
+    if (opcode == INT_spec.opcode && std::get<std::byte>(i->arg1) == INT_END) {
       break;
     }
   }

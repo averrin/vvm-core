@@ -321,7 +321,9 @@ address Core::JNE_a_func(address _pointer) {
   if (!checkFlag(ZF)) {
     auto dst = std::get<address>(src);
     if (dst.relative) {
-      dst = _pointer + dst.dst - ADDRESS_SIZE - BYTE_SIZE;
+      auto delta = (int16_t)dst.dst;
+      dst = _pointer + delta - ADDRESS_SIZE - BYTE_SIZE;
+      dst.relative = false;
     }
     _pointer = dst;
     seek(_pointer);
@@ -358,7 +360,9 @@ address Core::JE_func(address _pointer) {
   if (checkFlag(ZF)) {
     auto dst = std::get<address>(src);
     if (dst.relative) {
-      dst = _pointer + dst.dst - ADDRESS_SIZE - BYTE_SIZE;
+      auto delta = (int16_t)dst.dst;
+      dst = _pointer + delta - ADDRESS_SIZE - BYTE_SIZE;
+      dst.relative = false;
     }
     _pointer = dst;
     jumped = true;
@@ -450,7 +454,9 @@ address Core::JMP_a_func(address _pointer) {
 
   auto dst = std::get<address>(src);
   if (dst.relative) {
-    dst = _pointer + dst.dst - ADDRESS_SIZE - BYTE_SIZE;
+    auto delta = (int16_t)dst.dst;
+    dst = _pointer + delta - ADDRESS_SIZE - BYTE_SIZE;
+    dst.relative = false;
   }
   _pointer = dst;
   seek(_pointer);
@@ -488,6 +494,11 @@ address Core::RET_func(address _pointer) {
   seek(s_addr);
   _pointer = address{readInt()};
   setReg(EIP, _pointer);
+  seek(s_addr);
+  writeInt(0x0);
+
+  setReg(ESP, s_addr + INT_SIZE);
+
   seek(_pointer);
   printJump("RET", _pointer, true);
   return _pointer;

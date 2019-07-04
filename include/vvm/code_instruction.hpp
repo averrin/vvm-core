@@ -37,6 +37,7 @@ namespace analyzer {
         std::vector<std::string> aliases;
         instruction_arg arg1;
         instruction_arg arg2;
+        bool breakpoint = false;
 
         friend std::ostream& operator<<(std::ostream& os, const code_instruction& i)
         {
@@ -98,5 +99,5 @@ namespace analyzer {
         }
     };
 
-    typedef std::vector<code_instruction> script;
+    typedef std::vector<code_instruction*> script;
 }

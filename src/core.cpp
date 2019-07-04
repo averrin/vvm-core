@@ -74,34 +74,34 @@ void Core::compile(analyzer::script instructions) {
   code->offset = CODE_OFFSET;
 
   for (auto i : instructions) {
-    auto parsed_arg1 = i.arg1;
-    auto parsed_arg2 = i.arg2;
-    seek(i.offset);
+    auto parsed_arg1 = i->arg1;
+    auto parsed_arg2 = i->arg2;
+    seek(i->offset);
 
-    switch (i.spec.type) {
+    switch (i->spec.type) {
     case op_spec::AA:
-      writeCode(i.spec.opcode, std::get<address>(parsed_arg1),
+      writeCode(i->spec.opcode, std::get<address>(parsed_arg1),
                 std::get<address>(parsed_arg2));
       break;
     case op_spec::AI:
-      writeCode(i.spec.opcode, std::get<address>(parsed_arg1),
+      writeCode(i->spec.opcode, std::get<address>(parsed_arg1),
                 std::get<unsigned int>(parsed_arg2));
       break;
     case op_spec::AW:
-      writeCode(i.spec.opcode, std::get<address>(parsed_arg1),
+      writeCode(i->spec.opcode, std::get<address>(parsed_arg1),
                 std::get<std::byte>(parsed_arg2));
       break;
     case op_spec::A:
-      writeCode(i.spec.opcode, std::get<address>(parsed_arg1));
+      writeCode(i->spec.opcode, std::get<address>(parsed_arg1));
       break;
     case op_spec::I:
-      writeCode(i.spec.opcode, std::get<unsigned int>(parsed_arg1));
+      writeCode(i->spec.opcode, std::get<unsigned int>(parsed_arg1));
       break;
     case op_spec::W:
-      writeCode(i.spec.opcode, std::get<std::byte>(parsed_arg1));
+      writeCode(i->spec.opcode, std::get<std::byte>(parsed_arg1));
       break;
     case op_spec::Z:
-      writeCode(i.spec.opcode);
+      writeCode(i->spec.opcode);
       break;
     default:;
     }
@@ -133,7 +133,7 @@ void Core::compile(analyzer::script instructions) {
   writeInt(offset.dst);
   seek(CODE_OFFSET);
 
-  next_spec_type = instructions.front().spec.type;
+  next_spec_type = instructions.front()->spec.type;
   std::cout << "Header size: " << meta->size << std::endl;
   std::cout << "Compiled. Code size: " << code->size << std::endl;
   std::cout << "Device Table offset: " << d_table->offset << std::endl;
@@ -437,32 +437,49 @@ address Core::execStart() {
   return local_pointer;
 }
 
-void Core::execCode() {
+address Core::execCode(std::vector<address> breakpoints) {
   fmt::print(
       "= ADDR ===|====== INSTRUCTION =====|= FLAGS ==|===== VARIABLES ====\n");
   fmt::print(
       "          |                        |          |                    \n");
   auto local_pointer = execStart();
 
-  while (getState() == STATE_EXEC) {
+  auto paused = false;
+  while (getState() == STATE_EXEC && !paused) {
     setReg(EIP, local_pointer);
 
     local_pointer = execStep(local_pointer);
+    for (auto b : breakpoints) {
+      if (b.dst == local_pointer.dst) {
+        fmt::print("Breakpoint at {}\n", local_pointer);
+        paused = true;
+        break;
+      }
+    }
   }
   fmt::print(
       "          |                        |          |                    \n");
   fmt::print(
       "==================================================================\n\n");
+  return local_pointer;
 }
 
-void Core::execCode(address local_pointer) {
-  while (getState() == STATE_EXEC) {
+address Core::execCode(address local_pointer, std::vector<address> breakpoints) {
+  auto paused = false;
+  while (getState() == STATE_EXEC && !paused) {
     local_pointer = execStep(local_pointer);
+    for (auto b : breakpoints) {
+      if (b.dst == local_pointer.dst) {
+        paused = true;
+        break;
+      }
+    }
   }
   fmt::print(
       "          |                        |          |                    \n");
   fmt::print(
       "==================================================================\n\n");
+  return local_pointer;
 }
 
 address Core::execStep(address local_pointer) {
