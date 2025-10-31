@@ -47,6 +47,33 @@ Core::Core(t_handler th): _tickHandler(std::move(th)){
   writeHeader();
 };
 
+void Core::init(unsigned int codeCapacity) {
+  // Prepare memory layout so devices can be added before compiling code
+  code = std::make_unique<MemoryContainer>(MemoryContainer(codeCapacity));
+  code->offset = CODE_OFFSET;
+
+  d_table = std::make_unique<MemoryContainer>(MemoryContainer(DTABLE_SIZE));
+  d_table->offset = code->offset + code->size; // fixed by capacity
+
+  stack = std::make_unique<MemoryContainer>(MemoryContainer(STACK_SIZE));
+  stack->offset = d_table->offset + d_table->size;
+
+  // Initialize ESP to stack head and EIP to start of code
+  seek(ESP);
+  auto stack_head = stack->offset + stack->size;
+  writeInt(stack_head.dst);
+  seek(EIP);
+  writeInt(code->offset.dst);
+
+  // Initialize EDI to the next free memory location (after stack, or last mapped)
+  seek(EDI);
+  address nextFree = memory.size() == 0 ? (code->offset + code->size) : memory.back()->offset;
+  writeInt(nextFree.dst);
+
+  // Restore pointer to code start for subsequent writes
+  seek(CODE_OFFSET);
+}
+
 std::optional<op_spec> Core::getSpec(predicate filterFunc) {
   auto spec = std::find_if(specs.begin(), specs.end(), filterFunc);
   if (spec == specs.end()) {
@@ -70,8 +97,39 @@ void Core::setInterruptHandler(const std::byte interrupt,
 
 void Core::compile(analyzer::script instructions) {
   const auto temp_pointer = pointer;
-  code = std::make_unique<MemoryContainer>(MemoryContainer(instructions.size() * OP_aa_length));
-  code->offset = CODE_OFFSET;
+  // If init() was not called, set up minimal layout based on instruction size
+  if (!code) {
+    code = std::make_unique<MemoryContainer>(MemoryContainer(instructions.size() * OP_aa_length));
+    code->offset = CODE_OFFSET;
+    d_table = std::make_unique<MemoryContainer>(MemoryContainer(DTABLE_SIZE));
+    d_table->offset = code->offset + code->size;
+    stack = std::make_unique<MemoryContainer>(MemoryContainer(STACK_SIZE));
+    stack->offset = d_table->offset + d_table->size;
+    seek(ESP);
+    auto stack_head_new = stack->offset + stack->size;
+    writeInt(stack_head_new.dst);
+    seek(EIP);
+    writeInt(code->offset.dst);
+    seek(EDI);
+    address offset_new;
+    if (memory.size() == 0) {
+        offset_new = code->offset + code->size;
+    } else {
+        offset_new = memory.back()->offset;
+    }
+    writeInt(offset_new.dst);
+    seek(CODE_OFFSET);
+  } else {
+    // Ensure preallocated code capacity is enough
+    const unsigned int required = instructions.size() * OP_aa_length;
+    if (code->size < required) {
+      std::cerr << "Insufficient code capacity. Required: " << required << ", available: " << code->size << std::endl;
+      // Do not change layout; abort compile minimally
+      return;
+    }
+    // Ensure pointer is at code start before writing
+    seek(code->offset);
+  }
 
   for (auto i : instructions) {
     auto parsed_arg1 = i->arg1;
@@ -107,38 +165,17 @@ void Core::compile(analyzer::script instructions) {
     }
   }
 
+  // Do not resize or move d_table/stack if init() laid out memory
   auto written = pointer;
-  code->resize((written - code->offset).dst);
-
-  d_table = std::make_unique<MemoryContainer>(MemoryContainer(DTABLE_SIZE));
-  d_table->offset = code->offset + code->size;
-
-  stack = std::make_unique<MemoryContainer>(MemoryContainer(STACK_SIZE));
-  stack->offset = d_table->offset + d_table->size;
-
-  seek(ESP);
-  auto stack_head = stack->offset + stack->size;
-  writeInt(stack_head.dst);
-  seek(EIP);
-  std::cout << code->offset << std::endl << std::flush;
-  writeInt(code->offset.dst);
-  seek(EDI);
-
-  address offset;
-  if (memory.size() == 0) {
-      offset = code->offset + code->size;
-  } else {
-      offset = memory.back()->offset;
-  }
-  writeInt(offset.dst);
-  seek(CODE_OFFSET);
+  // Keep code->size as capacity to preserve offsets when init() is used
+  // If compile created code, offsets already reflect exact size
 
   next_spec_type = instructions.front()->spec.type;
   std::cout << "Header size: " << meta->size << std::endl;
-  std::cout << "Compiled. Code size: " << code->size << std::endl;
+  std::cout << "Compiled. Code capacity: " << code->size << std::endl;
   std::cout << "Device Table offset: " << d_table->offset << std::endl;
   std::cout << "Device Table size: " << d_table->size << std::endl;
-  std::cout << "Stack head: " << stack_head << std::endl;
+  std::cout << "Stack head: " << (stack->offset + stack->size) << std::endl;
   std::cout << "Stack size: " << stack->size << std::endl;
   std::cout << "Stack tail: " << stack->offset << std::endl;
 }
@@ -168,9 +205,9 @@ address Core::readAddress() {
     auto rf = readByte();
     return address{
       readInt(),
-      static_cast<bool>(rf & REDIRECT),
-      static_cast<bool>(rf & STOREBYTE),
-      static_cast<bool>(rf & RELATIVE),
+      static_cast<bool>(std::to_integer<int>(rf) & std::to_integer<int>(REDIRECT)),
+      static_cast<bool>(std::to_integer<int>(rf) & std::to_integer<int>(STOREBYTE)),
+      static_cast<bool>(std::to_integer<int>(rf) & std::to_integer<int>(RELATIVE)),
   };
 }
 
@@ -349,8 +386,18 @@ void Core::checkInterruption() {
     printIRQ(interrupt);
     if (interrupt == INT_END) {
       setState(STATE_END);
-    } else if (_intHandlers.count(interrupt) == 1) {
-      // _intHandlers[interrupt](_bytes, pointer.dst);
+    } 
+    if (interrupt != INT_END) {
+      const auto ch = readRegByte(EAX);
+      fmt::print("Output: {}\n", static_cast<char>(ch));
+    }
+    if (_intHandlers.count(interrupt) == 1) {
+      // Provide register/meta space for handlers (e.g., to read AL)
+      _intHandlers[interrupt](*meta, pointer.dst);
+    }
+    // Fallback explicit dispatch for known interrupts to avoid key mismatch issues
+    if (interrupt == INT_PRINT && _intHandlers.count(INT_PRINT) == 1) {
+      _intHandlers[INT_PRINT](*meta, pointer.dst);
     }
     setFlag(INTF, false);
   }
@@ -372,7 +419,7 @@ void Core::setReg(const address reg, const int value) {
 }
 
 address Core::readRegAddress(const address reg) {
-  return address{readRegInt(reg)};
+  return address{static_cast<unsigned int>(readRegInt(reg))};
 }
 
 int Core::readRegInt(const address reg) {
@@ -398,7 +445,14 @@ address Core::addDevice(std::shared_ptr<Device> device) {
     std::cerr << "Too many devices. Device " << fmt::format("0x{:02X}", static_cast<unsigned int>(device->deviceId)) << " wasnt connected" << std::endl;
     return addr;
   }
+  // Guard: memory layout (code/device table/stack) must be initialized by compile()
+  if (!d_table || !stack) {
+    std::cerr << "Cannot add device before compile() initializes memory layout. Skipping mapping for device "
+              << fmt::format("0x{:02X}", static_cast<unsigned int>(device->deviceId)) << std::endl;
+    return addr;
+  }
   auto _pointer = pointer;
+  std::cout << "Adding device: " << device->deviceName << std::endl;
   if (device->memory != nullptr && device->memory->size != 0) {
     addr = mapMem(device->memory);
     auto offset = d_table->offset + D_SIZE*devices.size();

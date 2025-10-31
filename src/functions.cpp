@@ -386,11 +386,11 @@ address Core::PUSH_a_func(address _pointer) {
   auto value = readInt();
   seek(ESP);
   auto s = address{readInt()};
-  const auto s_addr = s - INT_SIZE;
-  seek(s_addr);
+  const auto stack_addr = s - INT_SIZE;
+  seek(stack_addr);
   writeInt(value);
   seek(ESP);
-  writeInt(s_addr.dst);
+  writeInt(stack_addr.dst);
   seek(_pointer);
   printCode("PUSH", std::get<address>(src));
   return _pointer;
@@ -402,10 +402,10 @@ address Core::PUSH_i_func(address _pointer) {
   auto [value, _] = args.args;
   _pointer = args.current_pointer;
   auto s = readRegAddress(ESP);
-  const auto s_addr = s - INT_SIZE;
-  seek(s_addr);
+  const auto stack_addr = s - INT_SIZE;
+  seek(stack_addr);
   writeInt(value);
-  setReg(ESP, s_addr);
+  setReg(ESP, stack_addr);
   seek(_pointer);
   printCode("PUSH", std::get<unsigned int>(value));
   return _pointer;
@@ -417,10 +417,10 @@ address Core::PUSH_w_func(address _pointer) {
   auto [value, _] = args.args;
   _pointer = args.current_pointer;
   auto s = readRegAddress(ESP);
-  const auto s_addr = s - INT_SIZE;
-  seek(s_addr);
+  const auto stack_addr = s - INT_SIZE;
+  seek(stack_addr);
   writeInt(static_cast<unsigned int>(std::get<std::byte>(value)));
-  setReg(ESP, s_addr);
+  setReg(ESP, stack_addr);
   seek(_pointer);
   printCode("PUSH", std::get<std::byte>(value));
   return _pointer;
@@ -432,14 +432,14 @@ address Core::POP_func(address _pointer) {
   auto [dst, _] = args.args;
   _pointer = args.current_pointer;
 
-  const auto s_addr = readRegAddress(ESP);
-  seek(s_addr);
+  const auto stack_addr = readRegAddress(ESP);
+  seek(stack_addr);
   const auto value = readInt();
-  seek(s_addr);
+  seek(stack_addr);
   writeInt(0x0);
   seek(dst);
   writeInt(value);
-  setReg(ESP, s_addr + INT_SIZE);
+  setReg(ESP, stack_addr + INT_SIZE);
 
   seek(_pointer);
   printCode("POP", std::get<address>(dst));
@@ -473,10 +473,10 @@ address Core::CALL_func(address _pointer) {
   auto ret = readRegAddress(EIP) + BYTE_SIZE + ADDRESS_SIZE; // + CALL length + arg length
 
   auto s = readRegAddress(ESP);
-  const auto s_addr = s - INT_SIZE;
-  seek(s_addr);
+  const auto stack_addr = s - INT_SIZE;
+  seek(stack_addr);
   writeInt(ret.dst);
-  setReg(ESP, s_addr);
+  setReg(ESP, stack_addr);
 
   _pointer = std::get<address>(src);
   seek(_pointer);
@@ -490,14 +490,14 @@ address Core::RET_func(address _pointer) {
   auto [src, _] = args.args;
   _pointer = args.current_pointer;
 
-  const auto s_addr = readRegAddress(ESP);
-  seek(s_addr);
+  const auto stack_addr = readRegAddress(ESP);
+  seek(stack_addr);
   _pointer = address{readInt()};
   setReg(EIP, _pointer);
-  seek(s_addr);
+  seek(stack_addr);
   writeInt(0x0);
 
-  setReg(ESP, s_addr + INT_SIZE);
+  setReg(ESP, stack_addr + INT_SIZE);
 
   seek(_pointer);
   printJump("RET", _pointer, true);

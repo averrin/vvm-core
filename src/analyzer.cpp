@@ -116,7 +116,7 @@ script Analyzer::parseFile(std::string filename) {
             }
           }
           if (parsed && std::get<unsigned int>(parsed_arg1) < 256) {
-            parsed_arg1 = std::byte{std::get<unsigned int>(parsed_arg1)};
+            parsed_arg1 = static_cast<std::byte>(std::get<unsigned int>(parsed_arg1));
             specType = op_spec::W;
           }
           if (op == "JMP" || op == "JE" || op == "JNE") {
@@ -153,7 +153,7 @@ script Analyzer::parseFile(std::string filename) {
             }
           }
         if (parsed && std::get<unsigned int>(parsed_arg2) < 256) {
-            parsed_arg2 = std::byte{std::get<unsigned int>(parsed_arg2)};
+            parsed_arg2 = static_cast<std::byte>(std::get<unsigned int>(parsed_arg2));
             specType = op_spec::AW;
         }
         }

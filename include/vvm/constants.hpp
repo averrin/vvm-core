@@ -9,6 +9,11 @@
 #include "ostream.hpp"
 #include "vvm/address.hpp"
 
+// Undefine Windows macros that conflict with our constants
+#ifdef RELATIVE
+#undef RELATIVE
+#endif
+
 const std::byte INT_END{ 0xFF };
 const std::byte INT_TEST{ 0xF0 };
 const std::byte INT_PRINT{ 0x21 };

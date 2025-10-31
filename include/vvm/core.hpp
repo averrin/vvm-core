@@ -95,6 +95,7 @@ private:
 
 public:
 	Core(t_handler th);
+	void init(unsigned int codeCapacity);
 	op_spec::OP_TYPE next_spec_type;
 
     std::unique_ptr<MemoryContainer> meta;

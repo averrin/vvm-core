@@ -3,6 +3,14 @@
 
 #include "vvm/device.hpp"
 
+// Undefine Windows min/max macros
+#ifdef min
+#undef min
+#endif
+#ifdef max
+#undef max
+#endif
+
 class RngDevice : public Device {
 public:
     RngDevice(std::byte id, unsigned int s, unsigned int _min, unsigned int _max)
@@ -10,8 +18,8 @@ public:
         min(_min), max(_max){}
     std::string deviceName = "Random generator";
 	void tickHandler() {
-        for (auto i = 0; i < memory->size; i++) {
-            memory->writeByte(address{i}, std::byte{rand()%(max-min)+min});
+        for (unsigned int i = 0; i < memory->size; i++) {
+            memory->writeByte(address{i}, static_cast<std::byte>(rand()%(max-min)+min));
         }
     }
     unsigned int min;

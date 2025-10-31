@@ -6,8 +6,7 @@
 
 class MemoryDevice : public Device {
 public:
-    MemoryDevice(std::byte id, unsigned int s) : Device(id, std::make_shared<MemoryContainer>(s)){}
-    std::string deviceName = "Memory";
+    MemoryDevice(std::byte id, unsigned int s) : Device(id, std::make_shared<MemoryContainer>(s)) { deviceName = "Memory"; }
 	void tickHandler() {};
 };
 
